@@ -1,0 +1,11 @@
+export const SOCKET = {
+    EVENT_TYPE: {
+        SOCKET_CONNECTED: 'SOCKET_CONNECTED',
+        JOIN_ROOM: 'JOIN_ROOM',
+        PEER_MESSAGE: 'PEER_MESSAGE',
+        PEER_CONNECTED: 'PEER_CONNECTED',
+        PEER_DISCONNECTED: 'PEER_DISCONNECTED',
+        MUTE: 'MUTE',
+        UNMUTE: 'UNMUTE',
+    }
+}
