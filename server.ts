@@ -1,16 +1,21 @@
 import * as express from 'express';
 import * as morgan from 'morgan';
 import * as bodyParser from 'body-parser';
-import * as socketio from 'socket.io';
 import * as http from 'http';
+import * as WebSocket from 'ws';
+
+// Modules
+import { ClientManager } from './modules/client-manager.module';
+import { WSClient } from './modules/ws-client.module';
 
 class Server {
 
-    public app: express.Application;
-    public io: SocketIO.Server;
+    private app: express.Application;
     private server: http.Server;
     private allowedOrigins = ['http://localhost:4201'];
     private port = process.env.PORT || 3000;
+    private wss: WebSocket.Server;
+    private clientManager: ClientManager;
 
     public static bootstrap(): Server {
         return new Server();
@@ -19,9 +24,8 @@ class Server {
     constructor() {
         this.app = express();
         this.server = http.createServer(this.app);
-        this.io = socketio().listen(this.server);
         this.config();
-        this.setupSocket();
+        this.initWebsocket();
     }
 
     private config() {
@@ -52,22 +56,34 @@ class Server {
         });
     }
 
-    private setupSocket() {
-        this.io.on('connection', (socket: SocketIO.Socket) => {
-            console.log(`Socket ${socket.id} connected`);
+    private initWebsocket() {
+        const server = this.server;
+        this.wss = new WebSocket.Server({ server });
+        this.clientManager = new ClientManager();
 
-            socket.on('PEER_MESSAGE', (data: any) => {
-                socket.broadcast.emit('PEER_MESSAGE', data);
+        this.wss.on('connection', (ws, req) => {
+            const client = new WSClient(ws, req);
+            this.clientManager.addClient(client);
+
+            ws.on('message', (data: string) => {
+                try {
+                    const message = JSON.parse(data);
+                    this.clientManager.handleMessage(client, message);
+                } catch (e) {
+                    console.log(e);
+                }
             });
 
-            socket.on('JOIN_ROOM', (data: any) => {
-                socket.broadcast.emit('PEER_CONNECTED', data);
+            ws.on('close', () => {
+                try {
+                    this.clientManager.removeClient(client);
+                } catch (e) {
+                    console.log(e);
+                }
             });
 
-            socket.on('disconnect', function () {
-                socket.broadcast.emit('PEER_DISCONNECTED', {
-                    id: socket.id
-                });
+            ws.on('error', (error) => {
+                console.log(error);
             });
         });
     }
